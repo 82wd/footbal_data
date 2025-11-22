@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>球员阵容 - 足球数据平台</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link rel="stylesheet" href="css/style.css">
+  <style>
+    .player-card {
+      background: var(--card-bg);
+      border-radius: 16px;
+      padding: 1.2rem;
+      margin-bottom: 1rem;
+      transition: transform 0.3s ease;
+    }
+    .player-card:hover {
+      transform: translateY(-4px);
+    }
+    .player-avatar {
+      width: 70px;
+      height: 70px;
+      object-fit: cover;
+      border-radius: 50%;
+      background: rgba(255,255,255,0.1);
+      margin-right: 1rem;
+    }
+    .team-header {
+      text-align: center;
+      margin-bottom: 2.5rem;
+    }
+    .team-logo {
+      width: 100px;
+      height: auto;
+      margin-bottom: 1rem;
+    }
+  </style>
+</head>
+<body>
+  <!-- 导航栏 -->
+  <nav class="navbar navbar-expand-lg navbar-dark bg-primary fixed-top">
+    <div class="container">
+      <a class="navbar-brand" href="index.html">
+        <i class="bi bi-futbol" style="color: #00c9ff;"></i> 
+        <span style="font-weight: 700;">足球数据平台</span>
+      </a>
+      <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+        <span class="navbar-toggler-icon"></span>
+      </button>
+      <div class="collapse navbar-collapse" id="navbarNav">
+        <ul class="navbar-nav ms-auto">
+          <li class="nav-item"><a class="nav-link" href="matches.html">赛程</a></li>
+          <li class="nav-item"><a class="nav-link" href="teams.html">球队</a></li>
+        </ul>
+      </div>
+    </div>
+  </nav>
+
+  <div class="container py-5" style="margin-top: 80px;">
+    <!-- 球队头部信息 -->
+    <div id="teamHeader" class="team-header">
+      <div class="loading">
+        <div class="spinner-border text-primary" role="status">
+          <span class="visually-hidden">Loading...</span>
+        </div>
+        <p class="mt-3">正在加载球员数据...</p>
+      </div>
+    </div>
+
+    <!-- 搜索框 -->
+    <div class="search-box mb-4">
+      <input type="text" id="playerSearch" class="form-control" placeholder="搜索球员姓名...">
+      <i class="bi bi-search"></i>
+    </div>
+
+    <!-- 球员列表 -->
+    <div id="playersList" class="row g-3"></div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+  <script>
+    const API_KEY = "a5354d1f75826edc69e7f4493d19e9e9";
+
+    // 从 URL 获取 team ID
+    const urlParams = new URLSearchParams(window.location.search);
+    const teamId = urlParams.get('team');
+
+    if (!teamId) {
+      document.getElementById('teamHeader').innerHTML = '<p class="text-center text-danger">无效的球队ID</p>';
+    } else {
+      loadPlayers(teamId);
+    }
+
+    async function loadPlayers(teamId) {
+      try {
+        const res = await fetch(`https://api-football-v1.p.rapidapi.com/v3/players/squads?team=${teamId}`, {
+          headers: {
+            "X-RapidAPI-Key": API_KEY,
+            "X-RapidAPI-Host": "api-football-v1.p.rapidapi.com"
+          }
+        });
+        const data = await res.json();
+
+        if (!data.response || data.response.length === 0) {
+          document.getElementById('teamHeader').innerHTML = '<p class="text-center text-warning">暂无球员数据</p>';
+          return;
+        }
+
+        const squad = data.response[0];
+        renderTeamHeader(squad.team);
+        renderPlayerList(squad.players);
+      } catch (err) {
+        console.error(err);
+        document.getElementById('teamHeader').innerHTML = '<p class="text-center text-danger">加载失败，请稍后重试</p>';
+      }
+    }
+
+    function renderTeamHeader(team) {
+      document.getElementById('teamHeader').innerHTML = `
+        <img src="${team.logo}" class="team-logo" alt="${team.name}">
+        <h2>${team.name}</h2>
+        <p class="text-muted">${team.country} · 成立于 ${team.founded}</p>
+      `;
+    }
+
+    function renderPlayerList(players) {
+      const container = document.getElementById('playersList');
+      container.innerHTML = '';
+
+      players.forEach(p => {
+        const card = document.createElement('div');
+        card.className = 'col-md-6 col-lg-4';
+        card.innerHTML = `
+          <div class="player-card d-flex align-items-center">
+            <img src="${p.photo || 'https://via.placeholder.com/70'}" class="player-avatar" alt="${p.name}">
+            <div>
+              <h5 class="mb-0">${p.name}</h5>
+              <p class="text-muted mb-0">${p.age}岁 · ${p.nationality}</p>
+              <small class="text-success">${p.position || '未知位置'}</small>
+            </div>
+          </div>
+        `;
+        container.appendChild(card);
+      });
+
+      // 绑定搜索
+      document.getElementById('playerSearch').addEventListener('input', (e) => {
+        const term = e.target.value.toLowerCase();
+        document.querySelectorAll('.player-card').forEach(card => {
+          const name = card.querySelector('h5').textContent.toLowerCase();
+          card.style.display = name.includes(term) ? 'flex' : 'none';
+        });
+      });
+    }
+  </script>
+</body>
+</html>

@@ -48,30 +48,42 @@ async function loadAllData() {
   }
 }
 
-// 4. 获取联赛数据（优化：只获取联赛ID和名称）
-async function fetchLeagueData() {
-  const url = `https://api-football-v1.p.rapidapi.com/v3/leagues?season=2023`;
-  const response = await fetch(url, {
-    headers: {
-      "X-RapidAPI-Key": API_KEY,
-      "X-RapidAPI-Host": "api-football-v1.p.rapidapi.com"
-    }
-  });
-  return await response.json();
+// 替换原有的 fetchLeagueData 和 renderHomePage
+
+async function loadAllData() {
+  try {
+    showLoading();
+    const leagueIds = [39, 140, 78, 135, 61, 1]; // 英超、西甲...欧冠
+    const leaguePromises = leagueIds.map(id =>
+      fetch(`https://api-football-v1.p.rapidapi.com/v3/leagues?id=${id}&season=2023`, {
+        headers: {
+          "X-RapidAPI-Key": API_KEY,
+          "X-RapidAPI-Host": "api-football-v1.p.rapidapi.com"
+        }
+      }).then(res => res.json())
+    );
+
+    const results = await Promise.all(leaguePromises);
+    const leagues = results.flatMap(r => r.response); // 合并所有响应
+
+    renderHomePage(leagues);
+    await preloadTeamData();
+  } catch (error) {
+    console.error("加载失败:", error);
+    showError("数据加载失败，请检查网络或API Key");
+  }
 }
 
-// 5. 渲染首页
-function renderHomePage(data) {
-  const leagues = data.response.filter(l => 
-    [39, 140, 78, 135, 61, 1].includes(l.league.id)
-  );
+function renderHomePage(leagues) {
+  // 过滤无效数据（以防万一）
+  const validLeagues = leagues.filter(l => l.league && LEAGUE_IDS[l.league.id]);
 
   document.body.innerHTML = `
     <!-- 导航栏 -->
     <nav class="navbar navbar-expand-lg navbar-dark fixed-top">
       <div class="container">
         <a class="navbar-brand" href="index.html">
-          <i class="bi bi-futbol" style="color: #00c9ff;"></i> 
+          <i class="bi bi-futbol" style="color: #00c9ff;"></i>
           <span style="font-weight: 700;">足球数据平台</span>
         </a>
         <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
@@ -98,11 +110,11 @@ function renderHomePage(data) {
     <div class="container mb-5">
       <h2 class="text-center mb-4" style="color: #e0e0ff;">全球顶级联赛</h2>
       <div class="row">
-        ${leagues.map(l => `
+        ${validLeagues.map(l => `
           <div class="col-md-4 mb-4">
             <div class="league-card bg-gradient" style="background: linear-gradient(135deg, ${getLeagueColor(l.league.id)}, #2a2a40);">
               <h3 class="mb-3">${l.league.name}</h3>
-              <p class="mb-0">${l.league.rounds}轮 | ${l.teams.length}队</p>
+              <p class="mb-0">${l.league.rounds || 'N/A'}轮 | ${l.teams?.length || '?'}队</p>
               <a href="teams.html?league=${l.league.id}" class="btn btn-outline-light">查看球队</a>
             </div>
           </div>
@@ -118,7 +130,7 @@ function renderHomePage(data) {
     </footer>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
-    <script src="js/search.js"></script>
+    <script src="search.js"></script>
   `;
 }
 
